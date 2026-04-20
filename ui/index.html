@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UBID Platform — Karnataka C&I</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+  <style>
+    :root {
+      --ka-orange: #e8501a;
+      --ka-dark: #1a1a2e;
+      --ka-mid: #16213e;
+      --ka-accent: #0f3460;
+    }
+    body { background: #f4f6fa; font-size: 0.875rem; }
+    .sidebar {
+      width: 220px; min-height: 100vh;
+      background: var(--ka-dark); color: #ccc;
+      position: fixed; top: 0; left: 0; padding-top: 1rem;
+      z-index: 100;
+    }
+    .sidebar .brand {
+      color: var(--ka-orange); font-weight: 700;
+      font-size: 1rem; padding: 0 1rem 1rem;
+      border-bottom: 1px solid #333;
+    }
+    .sidebar .nav-link {
+      color: #aaa; padding: 0.6rem 1rem;
+      border-radius: 0; cursor: pointer;
+    }
+    .sidebar .nav-link:hover, .sidebar .nav-link.active {
+      background: var(--ka-accent); color: #fff;
+    }
+    .sidebar .nav-link i { margin-right: 0.5rem; }
+    .main-content { margin-left: 220px; padding: 1.5rem; }
+    .page { display: none; }
+    .page.active { display: block; }
+    .stat-card {
+      background: #fff; border-radius: 8px;
+      padding: 1rem 1.5rem; border-left: 4px solid var(--ka-orange);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    }
+    .stat-card .value { font-size: 2rem; font-weight: 700; color: var(--ka-dark); }
+    .stat-card .label { color: #888; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .badge-ACTIVE { background: #28a745; }
+    .badge-DORMANT { background: #fd7e14; }
+    .badge-CLOSED { background: #dc3545; }
+    .badge-UNCLASSIFIED { background: #6c757d; }
+    .badge-AUTO_LINK, .badge-AUTO_LINKED { background: #28a745; }
+    .badge-REVIEW { background: #fd7e14; }
+    .badge-REJECT, .badge-REJECTED { background: #dc3545; }
+    .badge-PENDING { background: #007bff; }
+    .badge-PAN { background: #6610f2; }
+    .badge-GST { background: #0d6efd; }
+    .badge-INT { background: #6c757d; }
+    .waterfall-bar {
+      height: 18px; border-radius: 3px;
+      display: inline-block; min-width: 4px;
+    }
+    .waterfall-pos { background: #28a745; }
+    .waterfall-neg { background: #dc3545; }
+    .evidence-timeline .event-item {
+      border-left: 3px solid #dee2e6;
+      padding: 0.4rem 0.75rem; margin-bottom: 0.3rem;
+    }
+    .event-item.cat-1 { border-color: #28a745; }
+    .event-item.cat-2 { border-color: #17a2b8; }
+    .event-item.cat-3 { border-color: #ffc107; }
+    .event-item.cat-4 { border-color: #fd7e14; }
+    .event-item.cat-5 { border-color: #dc3545; }
+    .record-card { background: #fff; border-radius: 8px; padding: 1rem; border: 1px solid #dee2e6; }
+    .probability-bar { height: 8px; border-radius: 4px; background: #dee2e6; }
+    .probability-fill { height: 100%; border-radius: 4px; }
+    .toast-container { position: fixed; top: 1rem; right: 1rem; z-index: 9999; }
+    #lookup-result, #analytics-result { display: none; }
+    table th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: #666; }
+  </style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="brand"><i class="bi bi-building"></i> UBID Platform</div>
+  <div class="mt-2">
+    <div class="nav-link active" onclick="showPage('dashboard')"><i class="bi bi-speedometer2"></i>Dashboard</div>
+    <div class="nav-link" onclick="showPage('lookup')"><i class="bi bi-search"></i>UBID Lookup</div>
+    <div class="nav-link" onclick="showPage('review')"><i class="bi bi-clipboard-check"></i>Review Queue <span id="review-badge" class="badge bg-warning text-dark ms-1">…</span></div>
+    <div class="nav-link" onclick="showPage('analytics')"><i class="bi bi-bar-chart-line"></i>Analytics</div>
+    <div class="nav-link" onclick="showPage('unmatched')"><i class="bi bi-exclamation-triangle"></i>Unmatched Events</div>
+  </div>
+  <div class="mt-auto" style="position:absolute;bottom:1rem;left:0;right:0;padding:0 1rem;">
+    <small class="text-muted">Karnataka C&I · UBID v1.0</small>
+  </div>
+</div>
+
+<div class="main-content">
+
+  <!-- ===== DASHBOARD ===== -->
+  <div class="page active" id="page-dashboard">
+    <h5 class="mb-3 text-muted">Dashboard</h5>
+    <div class="row g-3 mb-4" id="stat-cards">
+      <div class="col-md-2"><div class="stat-card"><div class="value" id="stat-source">—</div><div class="label">Source Records</div></div></div>
+      <div class="col-md-2"><div class="stat-card"><div class="value" id="stat-ubids">—</div><div class="label">Total UBIDs</div></div></div>
+      <div class="col-md-2"><div class="stat-card"><div class="value" id="stat-auto">—</div><div class="label">Auto-Linked Pairs</div></div></div>
+      <div class="col-md-2"><div class="stat-card"><div class="value" id="stat-queue">—</div><div class="label">Review Pending</div></div></div>
+      <div class="col-md-2"><div class="stat-card"><div class="value" id="stat-unmatched">—</div><div class="label">Unmatched Events</div></div></div>
+    </div>
+    <div class="row g-3">
+      <div class="col-md-5">
+        <div class="card">
+          <div class="card-header fw-semibold">Activity Status Breakdown</div>
+          <div class="card-body" id="status-breakdown">Loading…</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card">
+          <div class="card-header fw-semibold">Anchor Type Breakdown</div>
+          <div class="card-body" id="anchor-breakdown">Loading…</div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card">
+          <div class="card-header fw-semibold">PIN Code Summary</div>
+          <div class="card-body" id="pin-summary">Loading…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== LOOKUP ===== -->
+  <div class="page" id="page-lookup">
+    <h5 class="mb-3 text-muted">UBID Lookup</h5>
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-3">
+            <label class="form-label">Search by</label>
+            <select class="form-select" id="lookup-type">
+              <option value="ubid">UBID</option>
+              <option value="pan">PAN</option>
+              <option value="gstin">GSTIN</option>
+              <option value="name">Business Name</option>
+              <option value="source">Source Record ID</option>
+            </select>
+          </div>
+          <div class="col-md-3" id="lookup-sys-wrap" style="display:none">
+            <label class="form-label">Source System</label>
+            <select class="form-select" id="lookup-system">
+              <option>factories</option><option>shops</option>
+              <option>labour</option><option>kspcb</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Value</label>
+            <input class="form-control" id="lookup-value" placeholder="Enter value…" />
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-primary w-100" onclick="doLookup()"><i class="bi bi-search"></i> Search</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="lookup-result">
+      <div class="row g-3">
+        <div class="col-md-5">
+          <div class="card h-100">
+            <div class="card-header fw-semibold">UBID Detail</div>
+            <div class="card-body" id="ubid-detail-panel">—</div>
+          </div>
+        </div>
+        <div class="col-md-7">
+          <div class="card mb-3">
+            <div class="card-header fw-semibold">Activity Status</div>
+            <div class="card-body" id="activity-panel">—</div>
+          </div>
+          <div class="card">
+            <div class="card-header fw-semibold">Source Records</div>
+            <div class="card-body" id="source-records-panel">—</div>
+          </div>
+        </div>
+      </div>
+      <div class="card mt-3">
+        <div class="card-header fw-semibold">Provenance Log</div>
+        <div class="card-body" id="provenance-panel">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== REVIEW QUEUE ===== -->
+  <div class="page" id="page-review">
+    <h5 class="mb-3 text-muted">Review Queue <span id="rq-count" class="text-secondary fs-6 fw-normal">…</span></h5>
+    <div class="row g-2 mb-3">
+      <div class="col-auto">
+        <select class="form-select form-select-sm" id="rq-status-filter" onchange="loadReviewQueue()">
+          <option value="PENDING">Pending</option>
+          <option value="REVIEWED">Reviewed</option>
+          <option value="AUTO_LINKED">Auto-Linked</option>
+          <option value="REJECTED">Rejected</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-sm btn-outline-secondary" onclick="loadReviewQueue()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+      </div>
+    </div>
+    <div id="review-queue-list">Loading…</div>
+
+    <!-- Candidate detail modal -->
+    <div class="modal fade" id="review-modal" tabindex="-1">
+      <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Review Candidate</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body" id="modal-body">Loading…</div>
+          <div class="modal-footer">
+            <input class="form-control me-2" id="reviewer-id" placeholder="Your reviewer ID" style="max-width:180px" />
+            <textarea class="form-control me-2" id="review-notes" placeholder="Notes (optional)" rows="1" style="max-width:300px"></textarea>
+            <button class="btn btn-success" onclick="submitDecision('CONFIRM_MATCH')"><i class="bi bi-check-circle"></i> Confirm Match</button>
+            <button class="btn btn-danger" onclick="submitDecision('CONFIRM_NON_MATCH')"><i class="bi bi-x-circle"></i> Not a Match</button>
+            <button class="btn btn-warning" onclick="submitDecision('DEFER')"><i class="bi bi-clock"></i> Defer</button>
+            <button class="btn btn-secondary" onclick="submitDecision('ESCALATE')"><i class="bi bi-arrow-up-circle"></i> Escalate</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== ANALYTICS ===== -->
+  <div class="page" id="page-analytics">
+    <h5 class="mb-3 text-muted">Analytics</h5>
+    <div class="card mb-3">
+      <div class="card-header fw-semibold"><i class="bi bi-funnel"></i> Active Businesses Without Recent Inspection</div>
+      <div class="card-body">
+        <div class="row g-2 align-items-end mb-3">
+          <div class="col-md-2">
+            <label class="form-label">PIN Code</label>
+            <input class="form-control" id="a-pin" placeholder="560058 or leave blank" />
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Source System</label>
+            <select class="form-select" id="a-sys">
+              <option value="factories">factories</option>
+              <option value="shops">shops</option>
+              <option value="labour">labour</option>
+              <option value="kspcb">kspcb</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Months without inspection</label>
+            <input class="form-control" id="a-months" type="number" value="18" />
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-primary w-100" onclick="runAnalytics()"><i class="bi bi-play-fill"></i> Run Query</button>
+          </div>
+        </div>
+        <div id="analytics-result">
+          <div class="fw-semibold text-muted mb-2" id="analytics-label"></div>
+          <div class="table-responsive">
+            <table class="table table-sm table-hover">
+              <thead><tr>
+                <th>UBID</th><th>Business Name</th><th>PIN</th>
+                <th>Status</th><th>Days Since Inspection</th><th>Systems</th>
+              </tr></thead>
+              <tbody id="analytics-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header fw-semibold"><i class="bi bi-map"></i> PIN × Status Heatmap</div>
+      <div class="card-body" id="status-heatmap">Loading…</div>
+    </div>
+  </div>
+
+  <!-- ===== UNMATCHED EVENTS ===== -->
+  <div class="page" id="page-unmatched">
+    <h5 class="mb-3 text-muted">Unmatched Events <small class="text-muted fs-6">(could not be joined to a UBID)</small></h5>
+    <div id="unmatched-list">Loading…</div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast-container">
+  <div id="main-toast" class="toast align-items-center border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body" id="toast-msg"></div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const API = '/api/v1';
+let currentCandidateId = null;
+
+// ── Utilities ──────────────────────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelector(`.nav-link[onclick*="${name}"]`).classList.add('active');
+  if (name === 'dashboard') loadDashboard();
+  if (name === 'review') loadReviewQueue();
+  if (name === 'unmatched') loadUnmatched();
+  if (name === 'analytics') loadStatusHeatmap();
+}
+
+function toast(msg, type='success') {
+  const el = document.getElementById('main-toast');
+  el.className = `toast align-items-center border-0 text-bg-${type}`;
+  document.getElementById('toast-msg').textContent = msg;
+  bootstrap.Toast.getOrCreateInstance(el, {delay: 3000}).show();
+}
+
+async function api(path) {
+  const r = await fetch(API + path);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+async function apiPost(path, body) {
+  const r = await fetch(API + path, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+function badge(text, cls) {
+  return `<span class="badge badge-${text} ${cls || ''}">${text}</span>`;
+}
+
+function statusBadge(s) { return badge(s || 'UNCLASSIFIED'); }
+
+// ── Dashboard ──────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const d = await api('/analytics/dashboard');
+    document.getElementById('stat-source').textContent = d.total_source_records;
+    document.getElementById('stat-ubids').textContent = d.total_ubids;
+    document.getElementById('stat-auto').textContent = d.auto_linked_pairs;
+    document.getElementById('stat-queue').textContent = d.review_queue_pending;
+    document.getElementById('stat-unmatched').textContent = d.unmatched_events;
+    document.getElementById('review-badge').textContent = d.review_queue_pending;
+
+    // Status breakdown
+    const sb = document.getElementById('status-breakdown');
+    const total = Object.values(d.status_breakdown).reduce((a,b) => a+b, 0) || 1;
+    sb.innerHTML = Object.entries(d.status_breakdown).map(([s,c]) => `
+      <div class="mb-2">
+        <div class="d-flex justify-content-between mb-1">
+          <span>${statusBadge(s)}</span>
+          <strong>${c}</strong>
+        </div>
+        <div class="probability-bar">
+          <div class="probability-fill" style="width:${(c/total*100).toFixed(1)}%;background:${
+            s==='ACTIVE'?'#28a745':s==='DORMANT'?'#fd7e14':s==='CLOSED'?'#dc3545':'#6c757d'}"></div>
+        </div>
+      </div>`).join('');
+
+    // Anchor breakdown
+    const ab = document.getElementById('anchor-breakdown');
+    ab.innerHTML = Object.entries(d.anchor_breakdown).map(([t,c]) =>
+      `<div class="d-flex justify-content-between mb-1"><span>${badge(t)}</span><strong>${c}</strong></div>`
+    ).join('');
+
+    // PIN summary
+    const ps = document.getElementById('pin-summary');
+    const pins = await api('/analytics/status-summary');
+    const pinGroups = {};
+    pins.forEach(r => {
+      if (!pinGroups[r.pin_code]) pinGroups[r.pin_code] = 0;
+      pinGroups[r.pin_code] += r.count;
+    });
+    ps.innerHTML = Object.entries(pinGroups).map(([p,c]) =>
+      `<div class="d-flex justify-content-between"><code>${p}</code><strong>${c}</strong></div>`
+    ).join('');
+
+  } catch(e) { console.error(e); }
+}
+
+// ── Lookup ─────────────────────────────────────────────────────────────────
+document.getElementById('lookup-type').addEventListener('change', function() {
+  document.getElementById('lookup-sys-wrap').style.display =
+    this.value === 'source' ? 'block' : 'none';
+});
+
+async function doLookup() {
+  const type = document.getElementById('lookup-type').value;
+  const val = document.getElementById('lookup-value').value.trim();
+  if (!val) return toast('Enter a value to search', 'danger');
+
+  let url = '/ubid/lookup?';
+  if (type === 'ubid') url += 'ubid=' + encodeURIComponent(val);
+  else if (type === 'pan') url += 'pan=' + encodeURIComponent(val);
+  else if (type === 'gstin') url += 'gstin=' + encodeURIComponent(val);
+  else if (type === 'name') url += 'name=' + encodeURIComponent(val);
+  else {
+    const sys = document.getElementById('lookup-system').value;
+    url += `source_system=${sys}&source_record_id=${encodeURIComponent(val)}`;
+  }
+
+  try {
+    const r = await api(url);
+    if (!r.found) { toast('No UBID found for this query', 'warning'); return; }
+    renderLookupResult(r.record);
+    document.getElementById('lookup-result').style.display = 'block';
+  } catch(e) { toast('Lookup error: ' + e.message, 'danger'); }
+}
+
+function renderLookupResult(rec) {
+  document.getElementById('ubid-detail-panel').innerHTML = `
+    <p class="mb-1"><code class="fs-6">${rec.ubid}</code></p>
+    <p class="mb-1">${statusBadge(rec.status)} ${badge(rec.anchor_type)} ${rec.status_confidence ? `<span class="badge bg-secondary">${rec.status_confidence}</span>` : ''}</p>
+    <p class="mb-1"><strong>${rec.canonical_name || '—'}</strong></p>
+    <p class="mb-1 text-muted">${rec.canonical_address || '—'}</p>
+    <p class="mb-1">PIN: <code>${rec.canonical_pin || '—'}</code></p>
+    <p class="mb-0 text-muted small">Created: ${new Date(rec.created_at).toLocaleString()}</p>
+  `;
+
+  // Activity status
+  const as = rec.activity_status;
+  if (as) {
+    const ev = as.evidence_summary || {};
+    const driving = ev.driving_signal;
+    document.getElementById('activity-panel').innerHTML = `
+      <div class="mb-2">${statusBadge(as.status)} <span class="badge bg-secondary">${as.confidence}</span></div>
+      ${driving ? `<div class="evidence-timeline">
+        <div class="event-item cat-${driving.signal_category}">
+          <strong>${driving.event_type}</strong> — ${driving.source_system}
+          <div class="text-muted small">${driving.event_date} &nbsp; Category ${driving.signal_category}</div>
+        </div>
+        ${(ev.supporting_signals||[]).map(s => `
+          <div class="event-item cat-${s.signal_category}">
+            ${s.event_type} <span class="text-muted small">— ${s.event_date} (cat ${s.signal_category})</span>
+          </div>`).join('')}
+      </div>` : '<p class="text-muted">No events recorded.</p>'}
+    `;
+  } else {
+    document.getElementById('activity-panel').innerHTML = '<p class="text-muted">No activity status yet.</p>';
+  }
+
+  // Source records
+  document.getElementById('source-records-panel').innerHTML = `
+    <table class="table table-sm table-hover">
+      <thead><tr><th>System</th><th>Record ID</th><th>Name</th><th>PIN</th><th>PAN</th></tr></thead>
+      <tbody>
+        ${(rec.source_records||[]).map(r => `<tr>
+          <td><span class="badge bg-info text-dark">${r.source_system}</span></td>
+          <td><code>${r.source_record_id}</code></td>
+          <td>${r.business_name_raw||'—'}</td>
+          <td>${r.pin_code||'—'}</td>
+          <td>${r.pan ? `<code>${r.pan}</code>` : '—'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+
+  // Provenance
+  document.getElementById('provenance-panel').innerHTML = `
+    <table class="table table-sm">
+      <thead><tr><th>Event</th><th>Actor</th><th>Time</th><th>Details</th></tr></thead>
+      <tbody>
+        ${(rec.provenance||[]).map(p => `<tr>
+          <td><span class="badge bg-secondary">${p.event_type}</span></td>
+          <td>${p.actor}</td>
+          <td class="text-muted small">${new Date(p.created_at).toLocaleString()}</td>
+          <td class="small text-muted">${JSON.stringify(p.event_data||{})}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+// ── Review Queue ───────────────────────────────────────────────────────────
+async function loadReviewQueue() {
+  const status = document.getElementById('rq-status-filter').value;
+  const counts = await api('/review/queue/count');
+  document.getElementById('rq-count').textContent =
+    `(${counts.pending} pending, ${counts.reviewed} reviewed)`;
+  document.getElementById('review-badge').textContent = counts.pending;
+
+  const items = await api(`/review/queue?status=${status}&limit=50`);
+  if (!items.length) {
+    document.getElementById('review-queue-list').innerHTML =
+      '<p class="text-muted">No items in this queue.</p>';
+    return;
+  }
+
+  document.getElementById('review-queue-list').innerHTML = `
+    <table class="table table-hover">
+      <thead><tr>
+        <th>Priority</th><th>Record A</th><th>Record B</th>
+        <th>Probability</th><th>Zone</th><th>Status</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${items.map(c => `<tr>
+          <td>${(c.priority_score||0).toFixed(3)}</td>
+          <td><span class="badge bg-info text-dark">${c.record_a_system}</span> <code>${c.record_a_id}</code></td>
+          <td><span class="badge bg-info text-dark">${c.record_b_system}</span> <code>${c.record_b_id}</code></td>
+          <td>
+            <div class="probability-bar" style="width:80px">
+              <div class="probability-fill" style="width:${(c.match_probability*100).toFixed(0)}%;background:${
+                c.match_probability>0.9?'#28a745':c.match_probability>0.65?'#fd7e14':'#dc3545'}"></div>
+            </div>
+            <small>${(c.match_probability*100).toFixed(1)}%</small>
+          </td>
+          <td>${badge(c.zone)}</td>
+          <td>${badge(c.status)}</td>
+          <td><button class="btn btn-sm btn-outline-primary" onclick="openReviewModal('${c.id}')">
+            <i class="bi bi-eye"></i> Review
+          </button></td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+async function openReviewModal(candidateId) {
+  currentCandidateId = candidateId;
+  document.getElementById('modal-body').innerHTML = 'Loading…';
+  const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('review-modal'));
+  modal.show();
+
+  const c = await api(`/review/queue/${candidateId}`);
+  const features = c.feature_contributions || {};
+  const maxAbs = Math.max(1, ...Object.values(features).map(f => Math.abs(f.contribution)));
+
+  document.getElementById('modal-body').innerHTML = `
+    <div class="row g-3 mb-3">
+      <div class="col-md-6">
+        <div class="record-card">
+          <div class="badge bg-info text-dark mb-2">${c.record_a_system}</div> <code>${c.record_a_id}</code>
+          ${c.record_a ? `
+            <p class="mb-1 fw-semibold mt-2">${c.record_a.business_name_raw||'—'}</p>
+            <p class="mb-1 text-muted small">${c.record_a.address_raw||'—'}</p>
+            <p class="mb-1">PIN: <code>${c.record_a.pin_code||'—'}</code> &nbsp;
+              PAN: <code>${c.record_a.pan||'—'}</code></p>
+            <p class="mb-0">Type: ${c.record_a.entity_type||'—'}</p>` : ''}
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="record-card">
+          <div class="badge bg-info text-dark mb-2">${c.record_b_system}</div> <code>${c.record_b_id}</code>
+          ${c.record_b ? `
+            <p class="mb-1 fw-semibold mt-2">${c.record_b.business_name_raw||'—'}</p>
+            <p class="mb-1 text-muted small">${c.record_b.address_raw||'—'}</p>
+            <p class="mb-1">PIN: <code>${c.record_b.pin_code||'—'}</code> &nbsp;
+              PAN: <code>${c.record_b.pan||'—'}</code></p>
+            <p class="mb-0">Type: ${c.record_b.entity_type||'—'}</p>` : ''}
+        </div>
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <strong>Match probability: ${(c.match_probability*100).toFixed(1)}%</strong>
+      &nbsp; ${badge(c.zone)} &nbsp; Blocking pass: <code>${c.blocking_pass||'—'}</code>
+    </div>
+
+    <div class="card">
+      <div class="card-header fw-semibold">Feature Contributions (waterfall)</div>
+      <div class="card-body">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Feature</th><th>Value</th><th style="width:200px">Contribution</th><th>Score</th></tr></thead>
+          <tbody>
+            ${Object.entries(features)
+              .sort((a,b) => Math.abs(b[1].contribution) - Math.abs(a[1].contribution))
+              .map(([feat, data]) => {
+                const pct = Math.abs(data.contribution)/maxAbs*180;
+                const cls = data.contribution >= 0 ? 'waterfall-pos' : 'waterfall-neg';
+                return `<tr>
+                  <td><code>${feat}</code></td>
+                  <td class="text-muted small">${JSON.stringify(data.value)}</td>
+                  <td>
+                    <div class="${cls} waterfall-bar" style="width:${pct.toFixed(0)}px"></div>
+                  </td>
+                  <td class="${data.contribution>=0?'text-success':'text-danger'}">
+                    ${data.contribution>=0?'+':''}${data.contribution.toFixed(3)}
+                  </td>
+                </tr>`;
+              }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+async function submitDecision(decision) {
+  const reviewer = document.getElementById('reviewer-id').value.trim() || 'anonymous';
+  const notes = document.getElementById('review-notes').value.trim();
+  try {
+    await apiPost(`/review/queue/${currentCandidateId}/decision`, {decision, reviewer_id: reviewer, notes});
+    toast(`Decision recorded: ${decision}`, 'success');
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('review-modal')).hide();
+    loadReviewQueue();
+  } catch(e) { toast('Error: ' + e.message, 'danger'); }
+}
+
+// ── Analytics ──────────────────────────────────────────────────────────────
+async function runAnalytics() {
+  const pin = document.getElementById('a-pin').value.trim();
+  const sys = document.getElementById('a-sys').value;
+  const months = document.getElementById('a-months').value;
+  let url = `/analytics/active-without-inspection?source_system=${sys}&months=${months}&limit=200`;
+  if (pin) url += `&pin_code=${pin}`;
+
+  try {
+    const rows = await api(url);
+    document.getElementById('analytics-result').style.display = 'block';
+    document.getElementById('analytics-label').textContent =
+      `${rows.length} active ${sys} businesses in ${pin||'all PINs'} with no inspection in ${months} months`;
+    document.getElementById('analytics-tbody').innerHTML = rows.map(r => `<tr>
+      <td><code style="font-size:0.75rem">${r.ubid}</code></td>
+      <td>${r.canonical_name||'—'}</td>
+      <td><code>${r.canonical_pin||'—'}</code></td>
+      <td>${statusBadge(r.status)}</td>
+      <td>${r.days_since_last_inspection != null ? r.days_since_last_inspection + ' days' : '<span class="text-danger">Never</span>'}</td>
+      <td>${(r.source_systems||[]).map(s=>`<span class="badge bg-secondary me-1">${s}</span>`).join('')}</td>
+    </tr>`).join('');
+  } catch(e) { toast('Query error: ' + e.message, 'danger'); }
+}
+
+async function loadStatusHeatmap() {
+  try {
+    const rows = await api('/analytics/status-summary');
+    const pins = [...new Set(rows.map(r => r.pin_code))].sort();
+    const statuses = ['ACTIVE','DORMANT','CLOSED','UNCLASSIFIED'];
+    const grid = {};
+    rows.forEach(r => { if (!grid[r.pin_code]) grid[r.pin_code]={}; grid[r.pin_code][r.status]=r.count; });
+    document.getElementById('status-heatmap').innerHTML = `
+      <table class="table table-sm table-bordered mb-0" style="width:auto">
+        <thead><tr><th>PIN</th>${statuses.map(s=>`<th>${statusBadge(s)}</th>`).join('')}</tr></thead>
+        <tbody>${pins.map(p=>`<tr>
+          <td><code>${p}</code></td>
+          ${statuses.map(s=>`<td class="text-center">${(grid[p]||{})[s]||0}</td>`).join('')}
+        </tr>`).join('')}</tbody>
+      </table>`;
+  } catch(e) { document.getElementById('status-heatmap').innerHTML = '<p class="text-muted">No data.</p>'; }
+}
+
+// ── Unmatched Events ───────────────────────────────────────────────────────
+async function loadUnmatched() {
+  try {
+    const events = await api('/analytics/unmatched-events?limit=100');
+    document.getElementById('unmatched-list').innerHTML = `
+      <table class="table table-sm table-hover">
+        <thead><tr><th>System</th><th>Record ID</th><th>Event Type</th><th>Date</th><th>Join Status</th></tr></thead>
+        <tbody>
+          ${events.map(e => `<tr>
+            <td><span class="badge bg-info text-dark">${e.source_system}</span></td>
+            <td><code>${e.source_record_id}</code></td>
+            <td>${e.event_type}</td>
+            <td>${e.event_date}</td>
+            <td><span class="badge ${e.join_status==='UNMATCHED_UNKNOWN'?'bg-danger':'bg-warning text-dark'}">${e.join_status}</span></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch(e) { document.getElementById('unmatched-list').innerHTML = '<p class="text-muted">Error loading events.</p>'; }
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+loadDashboard();
+</script>
+</body>
+</html>
