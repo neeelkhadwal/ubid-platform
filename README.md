@@ -1,6 +1,6 @@
 # UBID Platform — Unified Business Identifier
 
-**Karnataka Commerce & Industry · Hackathon Round 1 & 2**
+**Karnataka Commerce & Industry · [AI for Bharat 2 Hackathon](https://www.hackerearth.com/community/challenges/hackathon/ai-for-bharat-2/) — Round 1 & 2**
 
 A system that links business records across 40+ Karnataka State department systems, assigns each real-world business a single Unified Business Identifier (UBID), and classifies every business as **Active**, **Dormant**, or **Closed** from a stream of activity events — all without modifying any source system.
 
