@@ -2,6 +2,7 @@
 UBID Platform — FastAPI application entry point.
 Serves the API and static reviewer UI.
 """
+import warnings
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -10,13 +11,28 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from fastapi import Depends
+
+from src.api.auth import Principal, ROLE_VIEWER, require_role
 from src.api.routers import analytics, review, ubid
+from src.config import settings
 from src.database.session import init_db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    if not settings.api_keys:
+        warnings.warn(
+            "API_KEYS is empty — all API requests will be rejected with 503. "
+            "Set API_KEYS in .env to enable access.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+    if "*" in settings.cors_origins:
+        raise RuntimeError(
+            "CORS_ORIGINS must not contain '*' — set an explicit allowlist."
+        )
     yield
 
 
@@ -29,9 +45,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=settings.cors_origins,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "X-API-Key"],
+    allow_credentials=False,
 )
 
 app.include_router(ubid.router, prefix="/api/v1")
@@ -51,3 +68,8 @@ if _ui_dir.exists():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/api/v1/me")
+def whoami(principal: Principal = Depends(require_role(ROLE_VIEWER))):
+    return {"name": principal.name, "role": principal.role}

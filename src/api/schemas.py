@@ -98,8 +98,7 @@ class MatchCandidateWithRecords(MatchCandidateOut):
 
 class ReviewDecisionRequest(BaseModel):
     decision: str  # CONFIRM_MATCH | CONFIRM_NON_MATCH | DEFER | ESCALATE
-    reviewer_id: str = "anonymous"
-    notes: str = ""
+    notes: str = Field(default="", max_length=4000)
 
 
 # ---------------------------------------------------------------------------

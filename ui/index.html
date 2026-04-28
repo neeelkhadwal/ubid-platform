@@ -88,7 +88,14 @@
     <div class="nav-link" onclick="showPage('analytics')"><i class="bi bi-bar-chart-line"></i>Analytics</div>
     <div class="nav-link" onclick="showPage('unmatched')"><i class="bi bi-exclamation-triangle"></i>Unmatched Events</div>
   </div>
-  <div class="mt-auto" style="position:absolute;bottom:1rem;left:0;right:0;padding:0 1rem;">
+  <div style="position:absolute;bottom:1rem;left:0;right:0;padding:0 1rem;">
+    <div class="mb-2">
+      <label class="form-label text-muted small mb-1">API Key</label>
+      <input type="password" id="api-key-input" class="form-control form-control-sm"
+             placeholder="X-API-Key" autocomplete="off" />
+      <button class="btn btn-sm btn-outline-light w-100 mt-1" onclick="saveApiKey()">Save</button>
+      <div class="text-muted small mt-1">User: <code id="principal-display">—</code></div>
+    </div>
     <small class="text-muted">Karnataka C&I · UBID v1.0</small>
   </div>
 </div>
@@ -215,8 +222,8 @@
           </div>
           <div class="modal-body" id="modal-body">Loading…</div>
           <div class="modal-footer">
-            <input class="form-control me-2" id="reviewer-id" placeholder="Your reviewer ID" style="max-width:180px" />
-            <textarea class="form-control me-2" id="review-notes" placeholder="Notes (optional)" rows="1" style="max-width:300px"></textarea>
+            <span class="me-2 text-muted small">Reviewer: <code id="reviewer-display">—</code></span>
+            <textarea class="form-control me-2" id="review-notes" placeholder="Notes (optional)" rows="1" style="max-width:300px" maxlength="4000"></textarea>
             <button class="btn btn-success" onclick="submitDecision('CONFIRM_MATCH')"><i class="bi bi-check-circle"></i> Confirm Match</button>
             <button class="btn btn-danger" onclick="submitDecision('CONFIRM_NON_MATCH')"><i class="bi bi-x-circle"></i> Not a Match</button>
             <button class="btn btn-warning" onclick="submitDecision('DEFER')"><i class="bi bi-clock"></i> Defer</button>
@@ -299,6 +306,36 @@
 const API = '/api/v1';
 let currentCandidateId = null;
 
+// ── API key handling ──────────────────────────────────────────────────────
+function getApiKey() { return localStorage.getItem('ubid_api_key') || ''; }
+function setApiKey(k) {
+  if (k) localStorage.setItem('ubid_api_key', k);
+  else localStorage.removeItem('ubid_api_key');
+}
+function saveApiKey() {
+  const v = document.getElementById('api-key-input').value.trim();
+  setApiKey(v);
+  toast(v ? 'API key saved' : 'API key cleared', v ? 'success' : 'warning');
+  refreshPrincipal();
+  loadDashboard();
+}
+async function refreshPrincipal() {
+  const pd = document.getElementById('principal-display');
+  const rd = document.getElementById('reviewer-display');
+  if (!getApiKey()) { pd.textContent = '—'; rd.textContent = '—'; return; }
+  try {
+    const r = await fetch(API + '/me', {headers: authHeaders()});
+    if (!r.ok) { pd.textContent = '—'; rd.textContent = '—'; return; }
+    const me = await r.json();
+    pd.textContent = me.name + ' (' + me.role + ')';
+    rd.textContent = me.name;
+  } catch { pd.textContent = '—'; rd.textContent = '—'; }
+}
+function authHeaders() {
+  const k = getApiKey();
+  return k ? {'X-API-Key': k} : {};
+}
+
 // ── Utilities ──────────────────────────────────────────────────────────────
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -319,7 +356,11 @@ function toast(msg, type='success') {
 }
 
 async function api(path) {
-  const r = await fetch(API + path);
+  const r = await fetch(API + path, {headers: authHeaders()});
+  if (r.status === 401 || r.status === 403) {
+    toast('Authentication required — set your API key in the sidebar', 'danger');
+    throw new Error('auth');
+  }
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
@@ -327,9 +368,13 @@ async function api(path) {
 async function apiPost(path, body) {
   const r = await fetch(API + path, {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
+    headers: {'Content-Type': 'application/json', ...authHeaders()},
     body: JSON.stringify(body),
   });
+  if (r.status === 401 || r.status === 403) {
+    toast('Authentication required — set your API key in the sidebar', 'danger');
+    throw new Error('auth');
+  }
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
@@ -591,14 +636,13 @@ async function openReviewModal(candidateId) {
 }
 
 async function submitDecision(decision) {
-  const reviewer = document.getElementById('reviewer-id').value.trim() || 'anonymous';
   const notes = document.getElementById('review-notes').value.trim();
   try {
-    await apiPost(`/review/queue/${currentCandidateId}/decision`, {decision, reviewer_id: reviewer, notes});
+    await apiPost(`/review/queue/${currentCandidateId}/decision`, {decision, notes});
     toast(`Decision recorded: ${decision}`, 'success');
     bootstrap.Modal.getOrCreateInstance(document.getElementById('review-modal')).hide();
     loadReviewQueue();
-  } catch(e) { toast('Error: ' + e.message, 'danger'); }
+  } catch(e) { if (e.message !== 'auth') toast('Error: ' + e.message, 'danger'); }
 }
 
 // ── Analytics ──────────────────────────────────────────────────────────────
@@ -664,6 +708,8 @@ async function loadUnmatched() {
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
+document.getElementById('api-key-input').value = getApiKey();
+refreshPrincipal();
 loadDashboard();
 </script>
 </body>

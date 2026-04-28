@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
+from src.api.auth import Principal, ROLE_REVIEWER, ROLE_VIEWER, require_role
 from src.api.schemas import AnalyticsQueryRequest, AnalyticsRow, DashboardStats
 from src.database.models import (
     ActivityEvent, ActivityStatus, MatchCandidate,
@@ -21,7 +22,10 @@ router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
 
 @router.get("/dashboard", response_model=DashboardStats)
-def dashboard(db: Session = Depends(get_db)):
+def dashboard(
+    db: Session = Depends(get_db),
+    _: Principal = Depends(require_role(ROLE_VIEWER)),
+):
     total_source = db.query(SourceRecord).count()
     total_ubids = db.query(UBIDRecord).count()
 
@@ -64,6 +68,7 @@ def active_without_inspection(
     months: int = Query(default=18, description="Months without inspection threshold"),
     limit: int = Query(default=100, le=500),
     db: Session = Depends(get_db),
+    _: Principal = Depends(require_role(ROLE_VIEWER)),
 ):
     """
     The canonical UBID query:
@@ -136,6 +141,7 @@ def active_without_inspection(
 def unmatched_events(
     limit: int = Query(default=50, le=200),
     db: Session = Depends(get_db),
+    _: Principal = Depends(require_role(ROLE_REVIEWER)),
 ):
     events = (
         db.query(ActivityEvent)
@@ -158,7 +164,10 @@ def unmatched_events(
 
 
 @router.get("/status-summary")
-def status_summary(db: Session = Depends(get_db)):
+def status_summary(
+    db: Session = Depends(get_db),
+    _: Principal = Depends(require_role(ROLE_VIEWER)),
+):
     rows = (
         db.query(
             UBIDRecord.canonical_pin,
